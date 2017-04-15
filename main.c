@@ -9,6 +9,9 @@
 #include "logBsp.h"
 
 
+// test whether sd card is full
+
+
 #define version 20170412
 
 int sysInit(void);

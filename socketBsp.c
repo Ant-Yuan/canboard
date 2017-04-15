@@ -10,7 +10,8 @@ void* NetTxThread(void *argv)
   int i=0;
   while(1)
   {
-    printf("net tx thread %d\n",i++);
+    // printf("net tx thread %d\n",i++);
+    
     usleep(500*1000);//线程休眠500ms
   }
 }
@@ -20,7 +21,7 @@ void* NetRxThread(void *argv)
   int i=0;
   while(1)
   {
-    printf("net rx thread %d\n",i++);
+    // printf("net rx thread %d\n",i++);
     usleep(500*1000);//线程休眠500ms
   }
 }

@@ -26,7 +26,7 @@ void* LogThread(void *argv)
   int i=0;
   while(1)
   {
-    printf("log thread %d\n",i++);
+    // printf("log thread %d\n",i++);
     sleep(1);//线程休眠1s
   }
 }
