@@ -11,6 +11,8 @@
 
 // test whether sd card is full
 
+char file2send_filepath[4096]; // 4096 is the max length of path in ubuntu
+
 
 #define version 20170412
 
@@ -27,20 +29,6 @@ int main(int argc, char **argv) {
   printf("version :%d\n",version);
   sysInit();
   
-  //创建网络接收线程
-  err = pthread_create(&NetTxThreadId, NULL, &NetTxThread, NULL);
-  if(err!=0){
-    printf("Create net tx Thread error!\n");  
-    return -1;
-  }
-  
-  //创建网络发送线程
-  err = pthread_create(&NetRxThreadId, NULL, &NetRxThread, NULL);
-  if(err!=0){
-    printf("Create net rx Thread error!\n");  
-    return -1;
-  }
-  
   //创建CAN发送线程
   err = pthread_create(&CanTxThreadId, NULL, &CanTxThread, NULL);
   if(err!=0)
@@ -54,6 +42,20 @@ int main(int argc, char **argv) {
   if(err!=0)
   {
     printf("Create can rx thread error!\n");  
+    return -1;
+  }
+  
+  //创建网络接收线程
+  err = pthread_create(&NetTxThreadId, NULL, &NetTxThread, NULL);
+  if(err!=0){
+    printf("Create net tx Thread error!\n");  
+    return -1;
+  }
+  
+  //创建网络发送线程
+  err = pthread_create(&NetRxThreadId, NULL, &NetRxThread, NULL);
+  if(err!=0){
+    printf("Create net rx Thread error!\n");  
     return -1;
   }
   

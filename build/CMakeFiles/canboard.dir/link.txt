@@ -1,0 +1,1 @@
+/usr/bin/cc  -g   CMakeFiles/canboard.dir/main.o CMakeFiles/canboard.dir/canBsp.o CMakeFiles/canboard.dir/logBsp.o CMakeFiles/canboard.dir/socketBsp.o  -o canboard -rdynamic -lpthread 
