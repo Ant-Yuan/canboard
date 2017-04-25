@@ -16,12 +16,12 @@
 #define PATH_BUFFER_LENGTH 128
 #define MSGSZ PATH_BUFFER_LENGTH
 #define SOCK_BUF_SIZE 1025
+const char* confFilePath = "./conf.ini";
 
 typedef struct msgbuf {
     long    mtype;
     char    mtext[MSGSZ];
 } message_buf;
-
 
 // return socket file descriptor
 int initSocket(const char *ip, int port)
@@ -47,12 +47,100 @@ int initSocket(const char *ip, int port)
     return sockfd;
 }
 
+
+void trim(const char* src, char* buff, const unsigned int sizeBuff)
+{
+    if(sizeBuff < 1)
+    return;
+
+    const char* current = src;
+    unsigned int i = 0;
+    while(current != '\0' && i < sizeBuff-1)
+    {
+        if(*current != ' ' && *current != '\t' && *current != '\n')
+            buff[i++] = *current;
+        ++current;
+    }
+    buff[i] = '\0';
+}
+
+void 
+parseLine(char* line, char *key, char *value)
+{
+    char *cp = 0; // Point to '='
+    cp = strchr(line, '=');
+    if (cp)
+    {
+        char keytemp[32] = {0};
+        char valuetemp[32] = {0};
+        strncpy(keytemp, line, cp - line);
+        strcpy(valuetemp , cp+1);
+        trim(keytemp, key, 32);
+        trim(valuetemp , value , 32);        
+    }
+    else
+    {
+        perror("Format error in parseLine");
+        return;
+    }
+}
+
+/*
+ * 0: success
+ * 1: fail
+ */
+int readCFG(const char *path, char ip[], int *port)
+{
+    FILE *fp = fopen(path, "r");
+    if (fp == NULL)
+    {
+        perror("Error in readCFG");
+        return 1;
+    }
+    
+    char line[128];
+    while(fgets(line, sizeof(line), fp))
+    {
+        char key[32] = {0};
+        char value[32] = {0};
+        parseLine(line, key, value);
+        // printf("Parsed line %s-%s\n", key, value);
+        if (strcmp(key, "ip") == 0)
+        {
+            printf("ip hit\n");
+            strcpy(ip, value);
+        }
+        else if(strcmp(key, "port") == 0)
+        {
+            printf("port hit\n");
+            *port = atoi(value);
+        }
+        else
+        {
+            printf("%s-%s\n", key, value);
+        }
+    }
+    /*
+     * Check for feof
+     */
+    if (!feof(fp)) 
+    {
+        perror("Read error in readCFG");
+        return 1;
+    }
+
+    fclose(fp);
+    
+}
+
+
+
 void* NetTxThread(void *argv)
 {
   int i=0;
   int sockfd;
-  const char* ip = "127.0.0.1";
-  int port = 6666;
+  char ip[16];
+  int port;
   char buf[SOCK_BUF_SIZE];
     
   /*
@@ -81,8 +169,13 @@ void* NetTxThread(void *argv)
     }
     else
     {
-        sockfd = initSocket(ip, port);
         /*
+         * read configuration file 
+         * get server IP and port number
+         */
+        readCFG(confFilePath, ip, &port);
+        sockfd = initSocket(ip, port);
+        /*========
         * Send the file to server. 
         */
         const char *file2send_path = rbuf.mtext;
