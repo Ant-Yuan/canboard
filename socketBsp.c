@@ -8,10 +8,12 @@
 #include "canBsp.h"
 #include <sys/msg.h>
 #include <errno.h>
-#include<sys/socket.h>
-#include<netinet/in.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include "sysManager.h"
+
 
 #define PATH_BUFFER_LENGTH 128
 #define MSGSZ PATH_BUFFER_LENGTH
@@ -21,6 +23,66 @@ typedef struct msgbuf {
     long    mtype;
     char    mtext[MSGSZ];
 } message_buf;
+
+
+
+//yyj add tx demo
+void *NetTx_Thread(void *args)
+{
+  while(1)
+  {
+    switch(CanboardDev.netDev.netState)
+    {
+      case NET_NONE://do nothing,wait for modem init		
+	break;
+      case NET_READY:
+	//need init socket and connect to server
+	//if(success)
+	// CanboardDev.netDev.netState=NET_CONNECTED;
+	//else
+	// CanboardDev.netDev.netState=NET_ERR;
+	break;
+      case NET_CONNECTED:
+	//wait file ok msg
+	//send package to server
+	//recive server ack msg
+	//send remain package
+	//send EOF file package
+	//if send failed in 10 timers goto net err
+	break;
+      case NET_ERR:
+	//wite err log
+	//if (connect to server err 5 timers )
+	//   reset modem CanboardDev.netDev.netState=NONE;
+	//else 
+	//    reconnect to server 
+	break;
+      default:
+	break;
+    }
+    usleep(200000);//200ms
+  }
+ 
+}
+
+//yyj add rx demo
+void *NetRx_Thread(void *args)
+{
+  while(1)
+  {
+    switch(CanboardDev.netDev.netState)
+    {
+      case NET_CONNECTED:
+	//recive server msg
+	//if need put msg to other Thread
+	break;
+      default:
+	break;
+    }
+    usleep(200000);//200ms
+  }
+  
+}
 
 
 // return socket file descriptor
