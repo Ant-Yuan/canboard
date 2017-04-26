@@ -1,14 +1,5 @@
-#include <stdlib.h>
-#include <bits/signum.h>
-#include <sys/ioctl.h>
-#include <linux/can.h>
-#include <sys/socket.h>
-#include <signal.h>
 /*说明：读写can数据，并将CAN数据写到SD卡里
  * 创建文档：20170412 yyj
- */ 
-
-/*
  * Added by yanjia: one sub-directory for one single day.
  * and the newly created file is named like f1002.bin
  * To test this file, you should run /home/tony-yan/Demos/CAN_TEST/can_send
@@ -24,6 +15,12 @@
 #include "logBsp.h"
 #include <sys/msg.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <bits/signum.h>
+#include <sys/ioctl.h>
+#include <linux/can.h>
+#include <sys/socket.h>
+#include <signal.h>
 
 #define INTERFACE "vcan0"
 #define BUFFSIZE 4096 // buffer size for writing to sd

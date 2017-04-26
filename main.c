@@ -31,13 +31,14 @@ int main(int argc, char **argv) {
   printf("version :%d\n",version);
   sysInit();
   
+  /*
   err = pthread_create(&SysManagerThreadId, NULL, &SysManagerThread, NULL);
   if(err!=0)
   {
     printf("Create SysManager Thread error!\n");  
     return -1;
-  }
-  
+  }*/
+ 
   //创建CAN发送线程
   err = pthread_create(&CanTxThreadId, NULL, &CanTxThread, NULL);
   if(err!=0)
@@ -53,7 +54,7 @@ int main(int argc, char **argv) {
     printf("Create can rx thread error!\n");  
     return -1;
   }
-  
+  /*
   //创建网络接收线程
   err = pthread_create(&NetTxThreadId, NULL, &NetTxThread, NULL);
   if(err!=0){
@@ -74,13 +75,14 @@ int main(int argc, char **argv) {
   {
     printf("Create log thread error!\n");  
     return -1;
-  }
+  }*/
   
-  pthread_join(NetTxThreadId,NULL);
-  pthread_join(NetRxThreadId,NULL);
+  //pthread_join(SysManagerThreadId,NULL);
+  //pthread_join(NetTxThreadId,NULL);
+  //pthread_join(NetRxThreadId,NULL);
   pthread_join(CanTxThreadId,NULL);
   pthread_join(CanRxThreadId,NULL);
-  pthread_join(LogThreadId,NULL);
+  //pthread_join(LogThreadId,NULL);
   
   return 0;
 }
