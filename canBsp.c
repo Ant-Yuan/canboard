@@ -21,6 +21,7 @@
 #include <linux/can.h>
 #include <sys/socket.h>
 #include <signal.h>
+#include "sysManager.h"
 
 #define INTERFACE "vcan0"
 #define BUFFSIZE 4096 // buffer size for writing to sd
@@ -32,21 +33,75 @@
 #define MSGSZ PATH_BUFFER_LENGTH
 #define CAN_DUMP_PATH_PREFIX "./" // Change to /media/udisk/ when deployed
 
-typedef struct msgbuf {
-    long    mtype;
-    char    mtext[MSGSZ];
-} message_buf;
 
 long fcnt = 1; // file created so far count
 
+
+int fdCAN0;
+int fdCAN1;
+ChildNodeInfo CnodeInfo;
+
+void checkChildOnline(void);
+void broadcastCollection(void);
+int openCanSocket(const char *canInterfaceName);
+int canCheckDataHandle(MsgBuf* msg,struct can_frame *pFrame);
+
 int canInit(void)
 {
+  //make sence in real board
+  system("ip link set can0 down");
+  system("ip link set can1 down");
+  system("ip link set can0 up type can bitrate 800000");
+  system("ip link set can1 up type can bitrate 800000");
+  
+  printf("init can bps 800k\n");
+  
+  fdCAN0=openCanSocket(CAN_NAME_CAN0);
+  fdCAN1=openCanSocket(CAN_NAME_CAN1);
+  
   return 0;
+}
+
+int openCanSocket(const char *canInterfaceName)
+{
+  // CAN connection variables
+  struct sockaddr_can addr;
+  struct ifreq ifr;
+  int sockfd=-1;
+  // Open the CAN network interface
+  sockfd = socket(PF_CAN, SOCK_RAW|SOCK_NONBLOCK, CAN_RAW);
+  if (-1 == sockfd)
+  {
+    printf("create socket error!\n");
+    return -1;
+  }
+  // Get the index of the network interface
+  strcpy(ifr.ifr_name, canInterfaceName);
+  if (ioctl(sockfd, SIOCGIFINDEX, &ifr) == -1)
+  {
+    printf("error get the index of interface!\n");
+    return -2;
+  }
+  // Bind the socket to the network interface
+  addr.can_family = AF_CAN;
+  addr.can_ifindex = ifr.ifr_ifindex;
+  if(bind(sockfd,(struct sockaddr*)(&addr),sizeof(addr))<0)
+  {
+    printf("error bind the socket interface!\n");
+    return -3;
+  }
+  return sockfd;
 }
 
 void* CanTxThread(void *argv)
 {
   int i=0;
+  
+  sleep(10);
+  
+  broadcastCollection();
+  SystemState=SYS_COLLECTION;
+  
   while(1)
   {
     // printf("can tx thread %d\n",i++);
@@ -137,6 +192,7 @@ void updateDir(struct tm *date, char *dirBuffer)
 
 // send socketBsp of the path
 // for it to send the file to server
+/*
 void notifySocket2Send(char *filepath, int msgid)
 {
     if (msgid == -1)
@@ -152,19 +208,199 @@ void notifySocket2Send(char *filepath, int msgid)
         fprintf(stderr, "msgsnd failed\n");  
         exit(EXIT_FAILURE);  
     }
+}*/
+
+void* CanRxThread(void *argv)
+{
+  MsgBuf msg;
+  int childId=0;
+  struct can_frame frame;
+  ssize_t nbr=CAN_MTU;
+  int i=0;
+  
+  while(1)
+  {
+    switch(SystemState)
+    {
+      case SYS_CHECK_CHILD:
+	//nbr=read(fdCAN0, &frame, CAN_MTU);
+	//if(nbr==CAN_MTU)
+	//{
+	//  if(msgrcv(CanMsgId,(void*)&msg,1,CAN_MSG_CHECK_START,IPC_NOWAIT))
+	//  {
+	//    canCheckDataHandle(&msg,&frame);
+	//  }
+	//}
+	break;
+      case SYS_COLLECTION:
+	nbr=read(fdCAN0, &frame, CAN_MTU);
+	if(nbr==CAN_MTU)
+	{
+	  for(i=0;i<frame.can_dlc;i++)
+	    printf("%d",frame.data[i]);
+	  printf("\n");
+	}
+	nbr=read(fdCAN1, &frame, CAN_MTU);
+	if(nbr==CAN_MTU)
+	{
+	  for(i=0;i<frame.can_dlc;i++)
+	    printf("%d",frame.data[i]);
+	  printf("\n");
+	}
+	break;
+    }
+    usleep(50*1000);
+  }
+}
+
+int canCheckDataHandle(MsgBuf* msg,struct can_frame *pFrame)
+{
+  int childId=0;
+  if(msg->type==CAN_MSG_CHECK_START)
+  {
+    childId=msg->msg[0];
+    if(pFrame->data[0]==MSG_CHECK&&pFrame->data[1]==childId)
+    {
+      msg->type=CAN_MSG_CHECK_OK;
+      msgsnd(CanMsgId,(void*)msg,1,0);
+      return 0;
+    }
+  }
+  return -1;
 }
 
 
-void* CanRxThread(void *argv)
+void broadcastCollection(void)
+{
+  struct can_frame frame;
+  ssize_t numBytes=0;
+  
+  frame.can_id=ROOT_CAN_STD_ID;
+  frame.can_dlc=2;
+  frame.data[0]=MSG_SYNC;
+  frame.data[1]=CHILD_DEV_BROADCAST;//child dev number
+  
+  numBytes = write(fdCAN0, &frame, CAN_MTU);
+  if(numBytes!=CAN_MTU)
+  {
+    printf("write broadcastCollection can0 failed!\n");
+  }
+  
+  numBytes = write(fdCAN1, &frame, CAN_MTU);
+  if(numBytes!=CAN_MTU)
+  {
+    printf("write broadcastCollection can1 failed!\n");
+  }
+}
+
+void checkChildOnline(void)
+{
+  uint16_t currChildId;
+  struct can_frame frame;
+  int i=0;
+  ssize_t numBytes=0;
+  MsgBuf msg;
+  
+  CnodeInfo.devFreq=FREQ_200HZ;
+  
+  SystemState=SYS_CHECK_CHILD;
+  
+  //need wait for child node ready
+  sleep(1);
+  
+  //0x0-0x0F 使用CAN1 child_node=H0 0x10-0x1F使用CAN2 child_node=h1
+  for(i=0;i<MAX_CHILD_DEV_NUM;i++)
+  {
+    currChildId=i;
+    frame.can_id=ROOT_CAN_STD_ID;
+    frame.can_dlc=3;
+    frame.data[0]=MSG_CHECK;
+    frame.data[1]=i+CHILD_DEV_START;//child dev number
+    frame.data[2]=CnodeInfo.devFreq;
+    
+    if(i<0x10)
+    {
+      numBytes = write(fdCAN0, &frame, CAN_MTU);
+      if(numBytes!=CAN_MTU)
+	printf("check can0 child node failed!\n");
+    }
+    else
+    {
+      numBytes = write(fdCAN1, &frame, CAN_MTU);
+      if(numBytes!=CAN_MTU)
+	printf("check can1 child node failed!\n");
+    }
+    //tell the rx thread to recive 
+    msg.type=CAN_MSG_CHECK_START;
+    msg.msg[0]=i+CHILD_DEV_START;
+    
+    msgsnd(CanMsgId, (void*)&msg, 1, IPC_NOWAIT);
+    sleep(1);
+
+    /*
+    if(msgrcv(CanMsgId,(void*)&msg,sizeof(MsgBuf),CAN_MSG_CHECK_OK,0))
+    {
+      printf("msg ?\n");
+      if(msg.type==CAN_MSG_CHECK_OK)
+	printf("msg ok\n");
+    }
+    else
+    {
+      printf("msg timeout\n");
+    }
+    */
+  }
+    
+    /*
+    if(evt.status==osEventMessage&&evt.value.v==MSG_CHECK)
+    {
+	    cNodeInfo.childStatus[i]=CHILD_OK;
+    }
+    else//osEventTimeout
+    {
+	    cNodeInfo.childStatus[i]=CHILD_OFFLINE;
+    }
+  }
+      
+      
+      for(int i=0;i<MAX_CHILD_DEV_NUM;i++)
+      {
+	      if(cNodeInfo.childStatus[i]!=CHILD_OK)
+	      {
+		      SystemState=SYS_CAN_ERR;
+	      }
+      }
+      if(SystemState!=SYS_CAN_ERR)
+      {
+	      SystemState=SYS_OK;
+      }
+	
+	__HAL_CAN_DISABLE_IT(&hcan1, CAN_IT_FMP0);
+	__HAL_CAN_DISABLE_IT(&hcan2, CAN_IT_FMP0);
+	
+	hcan1.pTxMsg->Data[0]=MSG_SYNC;						//¿ªÊ¼²ÉÑù
+	hcan1.pTxMsg->Data[1]=CHILD_DEV_BROADCAST;//ËùÓÐÉè±¸
+	
+	hcan2.pTxMsg->Data[0]=MSG_SYNC;						//¿ªÊ¼²ÉÑù
+	hcan2.pTxMsg->Data[1]=CHILD_DEV_BROADCAST;//ËùÓÐÉè±¸
+	
+	HAL_CAN_Transmit(&hcan1,MAX_CAN_TX_TIMEOUT);
+	HAL_CAN_Transmit(&hcan1,MAX_CAN_TX_TIMEOUT);
+	HAL_CAN_Transmit(&hcan2,MAX_CAN_TX_TIMEOUT);
+	HAL_CAN_Transmit(&hcan2,MAX_CAN_TX_TIMEOUT);
+	
+	__HAL_CAN_ENABLE_IT(&hcan1, CAN_IT_FMP0);
+	__HAL_CAN_ENABLE_IT(&hcan2, CAN_IT_FMP0);
+	*/
+}
+
+
+void* CanRxThread1(void *argv)
 {
     
     // int i=0;
     int rc;
     
-    /*
-     * Get the message queue id for the
-     * "name" 1234
-     */
     key_t key;
     key = 1234;
     int msgid = -1;
@@ -241,7 +477,7 @@ void* CanRxThread(void *argv)
                     strcpy(pathTemp, path);
                     out = newFileForWrite(out, filename, dir, path);
                     
-                    notifySocket2Send(pathTemp, msgid);
+                    //notifySocket2Send(pathTemp, msgid);
                 }
                 
                 // check whether current file has been full
@@ -254,7 +490,7 @@ void* CanRxThread(void *argv)
                     char pathTemp[PATH_BUFFER_LENGTH] = {0};
                     strcpy(pathTemp, path);
                     out = newFileForWrite(out, filename, dir, path);
-                    notifySocket2Send(pathTemp, msgid);
+                    //notifySocket2Send(pathTemp, msgid);
                 }
                 
                 processFrame(&frame, out);
@@ -262,7 +498,7 @@ void* CanRxThread(void *argv)
                 printf("frameCount:%d\n", frameCount);
                 break;
             case -1:
-                /* error handle: signal and delay before continue */
+                //error handle: signal and delay before continue
             default:
                 continue;
                 
@@ -276,3 +512,5 @@ void* CanRxThread(void *argv)
         _exit(1);
     }
 }
+
+

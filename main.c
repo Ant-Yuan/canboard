@@ -8,16 +8,16 @@
 #include "socketBsp.h"
 #include "logBsp.h"
 #include "sysManager.h"
-
+#include <sys/msg.h>
 
 // test whether sd card is full
 
 char file2send_filepath[4096]; // 4096 is the max length of path in ubuntu
 
-
-#define version 20170412
+#define version 20170427
 
 int sysInit(void);
+int msgQueueInit(void);
 
 pthread_t SysManagerThreadId;
 pthread_t NetTxThreadId;
@@ -51,6 +51,7 @@ int main(int argc, char **argv) {
   err = pthread_create(&CanRxThreadId, NULL, &CanRxThread, NULL);
   if(err!=0)
   {
+    printf("12");
     printf("Create can rx thread error!\n");  
     return -1;
   }
@@ -83,11 +84,46 @@ int main(int argc, char **argv) {
   pthread_join(CanTxThreadId,NULL);
   pthread_join(CanRxThreadId,NULL);
   //pthread_join(LogThreadId,NULL);
-  
+  while(1)
+  {
+  }
   return 0;
 }
 
 int sysInit(void)
 {
+  SystemState=SYS_NOT_INIT;
+  canInit();
+  msgQueueInit();
+  
+  SystemState=SYS_READY;
+  
   return 0;
 }
+
+int msgQueueInit(void)
+{
+  //remove msg queue
+  CanMsgId=-1;
+  SdMsgId=-1;
+  
+  //0660表示用户和同组用户有读写权限，其他用户没有任何访问权限。 
+  CanMsgId = msgget((key_t)MSGQUEUE_CAN, (IPC_CREAT|0666));
+  SdMsgId = msgget((key_t)MSGQUEUE_SD, (IPC_CREAT|0666));
+  
+  if(CanMsgId<0||SdMsgId<0)
+  {
+    printf("create msg queue failed!\n");
+    return -1;
+  }
+  else
+    return 0;
+}
+
+
+
+
+
+
+
+

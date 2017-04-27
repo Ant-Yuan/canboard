@@ -6,9 +6,19 @@
 #include <string.h>
 #include <errno.h>
 
+
+int CanMsgId=-1;
+int SdMsgId=-1;
+
 CANBOARD_DEV CanboardDev;
+SysStatus SystemState;
+
+char SD_Path[255];  	//SD logical drive path
+
 int SD_handler(void);
 void test_plug(void);
+
+
 
 void* SysManagerThread(void *argv)
 {
