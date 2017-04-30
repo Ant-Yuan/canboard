@@ -7,6 +7,7 @@
 #include "canBsp.h"
 #include "socketBsp.h"
 #include "logBsp.h"
+#include "sysManager.h"
 
 
 // test whether sd card is full
@@ -18,6 +19,7 @@ char file2send_filepath[4096]; // 4096 is the max length of path in ubuntu
 
 int sysInit(void);
 
+pthread_t SysManagerThreadId;
 pthread_t NetTxThreadId;
 pthread_t NetRxThreadId;
 pthread_t CanTxThreadId;
@@ -28,6 +30,13 @@ int main(int argc, char **argv) {
   int err;
   printf("version :%d\n",version);
   sysInit();
+  
+  err = pthread_create(&SysManagerThreadId, NULL, &SysManagerThread, NULL);
+  if(err!=0)
+  {
+    printf("Create SysManager Thread error!\n");  
+    return -1;
+  }
   
   //创建CAN发送线程
   err = pthread_create(&CanTxThreadId, NULL, &CanTxThread, NULL);
@@ -46,14 +55,14 @@ int main(int argc, char **argv) {
   }
   
   //创建网络接收线程
-  err = pthread_create(&NetTxThreadId, NULL, &NetTxThread, NULL);
+  err = pthread_create(&NetTxThreadId, NULL, &NetTx_Thread, NULL);
   if(err!=0){
     printf("Create net tx Thread error!\n");  
     return -1;
   }
   
   //创建网络发送线程
-  err = pthread_create(&NetRxThreadId, NULL, &NetRxThread, NULL);
+  err = pthread_create(&NetRxThreadId, NULL, &NetRx_Thread, NULL);
   if(err!=0){
     printf("Create net rx Thread error!\n");  
     return -1;

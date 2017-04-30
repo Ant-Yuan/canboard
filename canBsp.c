@@ -27,7 +27,7 @@
 
 #define INTERFACE "vcan0"
 #define BUFFSIZE 4096 // buffer size for writing to sd
-#define FRAME_PER_FILE 20
+#define FRAME_PER_FILE 10
 #define DIR_NAME_FMT "%d-%d-%d" // day-mon-year
 #define PATH_BUFFER_LENGTH 128
 #define DIR_BUFFER_LENGTH 10
@@ -60,7 +60,6 @@ void* CanTxThread(void *argv)
 // write the frame to the file
 void processFrame(const struct can_frame *frame, FILE *out)
 {
-    
     if (out)
     {
         /* get file written to pointed by out */
@@ -72,7 +71,7 @@ void processFrame(const struct can_frame *frame, FILE *out)
         readlink(path, result, sizeof(result)-1);
 
         /* Print the result. */
-        printf("writing to %s\n", result);
+        // printf("writing to %s\n", result);
         fwrite(frame, sizeof(frame), 1, out);
     }
     else
@@ -97,7 +96,7 @@ void setFileName(char *buffer)
     date = localtime(&seconds);
     //sprintf(buffer, DIR_NAME_FMT, date->tm_mday, date->tm_mon, date->tm_year);
     sprintf(buffer, "f%ld.bin", fcnt++);
-    printf("set filename %s\n", buffer);
+    // printf("set filename %s\n", buffer);
 }
 
 FILE* newFileForWrite(FILE *out, char *filenamebuf, char *dirbuf, char *pathbuf)
@@ -107,7 +106,6 @@ FILE* newFileForWrite(FILE *out, char *filenamebuf, char *dirbuf, char *pathbuf)
     }
     setFileName(filenamebuf);
     memset(pathbuf, 0, PATH_BUFFER_LENGTH);
-    // Add the can dump path prefix
     strcat(pathbuf, CAN_DUMP_PATH_PREFIX);
     strcat(pathbuf, dirbuf);
     strcat(pathbuf, "/");
@@ -160,7 +158,6 @@ void notifySocket2Send(char *filepath, int msgid)
 
 void* CanRxThread(void *argv)
 {
-    
     // int i=0;
     int rc;
     
@@ -191,7 +188,7 @@ void* CanRxThread(void *argv)
     }
         
     // Get the index of the network interface
-    strncpy(ifr.ifr_name, INTERFACE, IFNAMSIZ);
+    strncpy(ifr.ifr_name, INTERFACE, IF_NAMESIZE);
     if (ioctl(sockfd, SIOCGIFINDEX, &ifr) == -1) {
         printf("error when get the index of interface!\n");
         _exit(1);
@@ -262,7 +259,7 @@ void* CanRxThread(void *argv)
                 
                 processFrame(&frame, out);
                 frameCount++;
-                printf("frameCount:%d\n", frameCount);
+                // printf("frameCount:%d\n", frameCount);
                 break;
             case -1:
                 /* error handle: signal and delay before continue */
